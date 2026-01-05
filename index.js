@@ -28,7 +28,9 @@ try {
 const { email, password } = req.body;
 
 await pool.query(
-"INSERT INTO users (email, password_hash, role, created_at) VALUES ($1, $2, 'user', NOW())",
+`INSERT INTO users
+(email, password_hash, role, created_at, last_login)
+VALUES ($1, $2, 'user', NOW(), NOW())`,
 [email, password]
 );
 
