@@ -78,7 +78,18 @@ res.json({ received: true });
 res.status(400).send(`Webhook Error: ${err.message}`);
 }
 });
-
+app.post("/check", async (req,res)=>{
+const { email } = req.body;
+const r = await pool.query(
+"SELECT premium FROM users_new WHERE email=$1",
+[email]
+);
+if(r.rows.length>0){
+res.json({premium:r.rows[0].premium});
+} else {
+res.json({premium:false});
+}
+});
 app.listen(process.env.PORT || 3000, ()=>{
 console.log("Veluria backend running");
 });
