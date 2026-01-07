@@ -28,7 +28,7 @@ try {
 const { email, password } = req.body;
 
 await pool.query(
-`INSERT INTO users
+`INSERT INTO users_new
 (email, password_hash, role, created_at, last_login)
 VALUES ($1, $2, 'user', NOW(), NOW())`,
 [email, password]
@@ -45,7 +45,7 @@ try {
 const { email, password } = req.body;
 
 const r = await pool.query(
-"SELECT * FROM users WHERE email=$1 AND password_hash=$2",
+"SELECT * FROM users_new WHERE email=$1 AND password_hash=$2",
 [email, password]
 );
 
