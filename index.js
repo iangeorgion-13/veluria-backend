@@ -7,27 +7,37 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 
-app.use(express.json());
+// IMPORTANTE: Stripe webhook necesita raw body
+app.use((req, res, next) => {
+if (req.originalUrl === "/stripe-webhook") {
+next();
+} else {
+express.json()(req, res, next);
+}
+});
 
 const pool = new Pool({
 connectionString: process.env.DATABASE_URL,
 ssl: { rejectUnauthorized: false }
 });
 
-// Health
+// Health check
 app.get("/", (req,res)=>{
-res.json({status:"Veluria API running"});
+res.json({status:"Veluria backend running"});
 });
 
 // Register
 app.post("/register", async (req,res)=>{
 try{
 const { email, password } = req.body;
+
 await pool.query(
-`INSERT INTO users_new (email,password_hash,role,created_at,last_login,premium)
+`INSERT INTO users_new
+(email, password_hash, role, created_at, last_login, premium)
 VALUES ($1,$2,'user',NOW(),NOW(),false)`,
 [email,password]
 );
+
 res.json({success:true});
 }catch(e){
 res.json({success:false,error:e.message});
@@ -38,11 +48,13 @@ res.json({success:false,error:e.message});
 app.post("/login", async (req,res)=>{
 try{
 const { email, password } = req.body;
+
 const r = await pool.query(
 "SELECT premium FROM users_new WHERE email=$1 AND password_hash=$2",
 [email,password]
 );
-if(r.rows.length>0){
+
+if(r.rows.length > 0){
 res.json({success:true,premium:r.rows[0].premium});
 } else {
 res.json({success:false});
@@ -52,8 +64,24 @@ res.json({success:false});
 }
 });
 
+// Premium check (para Explore)
+app.post("/check", async (req,res)=>{
+const { email } = req.body;
+
+const r = await pool.query(
+"SELECT premium FROM users_new WHERE email=$1",
+[email]
+);
+
+if(r.rows.length > 0){
+res.json({premium:r.rows[0].premium});
+} else {
+res.json({premium:false});
+}
+});
+
 // Stripe webhook
-app.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
+app.post("/stripe-webhook", express.raw({type: "application/json"}), async (req, res) => {
 const sig = req.headers["stripe-signature"];
 
 try {
@@ -65,12 +93,14 @@ sig,
 
 if (event.type === "checkout.session.completed") {
 const session = event.data.object;
-const email = session.customer_details.email;
+const email = session.client_reference_id;
 
+if(email){
 await pool.query(
 "UPDATE users_new SET premium=true WHERE email=$1",
 [email]
 );
+}
 }
 
 res.json({ received: true });
@@ -78,18 +108,7 @@ res.json({ received: true });
 res.status(400).send(`Webhook Error: ${err.message}`);
 }
 });
-app.post("/check", async (req,res)=>{
-const { email } = req.body;
-const r = await pool.query(
-"SELECT premium FROM users_new WHERE email=$1",
-[email]
-);
-if(r.rows.length>0){
-res.json({premium:r.rows[0].premium});
-} else {
-res.json({premium:false});
-}
-});
+
 app.listen(process.env.PORT || 3000, ()=>{
 console.log("Veluria backend running");
 });
