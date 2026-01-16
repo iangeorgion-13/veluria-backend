@@ -1,6 +1,7 @@
 import express from "express";
 import pkg from "pg";
 import Stripe from "stripe";
+import cors from "cors";
 
 const { Pool } = pkg;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -8,23 +9,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
 /* =========================
-CORS – OBLIGATORIO
+CORS (SOLUCIÓN DEFINITIVA)
 ========================= */
-app.use((req, res, next) => {
-res.setHeader("Access-Control-Allow-Origin", "*");
-res.setHeader(
-"Access-Control-Allow-Headers",
-"Origin, X-Requested-With, Content-Type, Accept"
-);
-res.setHeader(
-"Access-Control-Allow-Methods",
-"GET, POST, OPTIONS"
-);
-if (req.method === "OPTIONS") {
-return res.sendStatus(200);
-}
-next();
-});
+app.use(cors({
+origin: "*",
+methods: ["GET", "POST", "OPTIONS"],
+allowedHeaders: ["Content-Type"]
+}));
 
 /* =========================
 BODY PARSER
@@ -89,7 +80,7 @@ res.json({ success: true, premium: r.rows[0].premium });
 } else {
 res.json({ success: false });
 }
-} catch (e) {
+} catch {
 res.json({ success: false });
 }
 });
