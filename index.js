@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
 /* =========================
-CORS (SOLUCIÓN DEFINITIVA)
+CORS
 ========================= */
 app.use(cors({
 origin: "*",
@@ -22,7 +22,7 @@ BODY PARSER
 ========================= */
 app.use((req, res, next) => {
 if (req.originalUrl === "/stripe-webhook") {
-next(); // Stripe necesita raw body
+next();
 } else {
 express.json()(req, res, next);
 }
@@ -86,7 +86,7 @@ res.json({ success: false });
 });
 
 /* =========================
-PREMIUM CHECK (EXPLORE)
+CHECK PREMIUM
 ========================= */
 app.post("/check", async (req, res) => {
 const { email } = req.body;
@@ -100,6 +100,37 @@ if (r.rows.length > 0) {
 res.json({ premium: r.rows[0].premium });
 } else {
 res.json({ premium: false });
+}
+});
+
+/* =========================
+CREATE STRIPE CHECKOUT
+========================= */
+app.post("/create-checkout", async (req, res) => {
+const { email } = req.body;
+
+try {
+const session = await stripe.checkout.sessions.create({
+mode: "subscription",
+payment_method_types: ["card"],
+customer_email: email,
+client_reference_id: email,
+line_items: [{
+price_data: {
+currency: "usd",
+product_data: { name: "Veluria Premium" },
+unit_amount: 1000,
+recurring: { interval: "month" }
+},
+quantity: 1
+}],
+success_url: "https://iangeorgion-13.github.io/veluria-site/Login.html",
+cancel_url: "https://iangeorgion-13.github.io/veluria-site/Subscribe.html"
+});
+
+res.json({ url: session.url });
+} catch (e) {
+res.status(500).json({ error: e.message });
 }
 });
 
