@@ -37,6 +37,29 @@ ssl: { rejectUnauthorized: false }
 });
 
 /* =========================
+🔧 DB FIX AUTOMÁTICO
+(se ejecuta una vez al iniciar)
+========================= */
+(async () => {
+try {
+await pool.query(`
+ALTER TABLE users_new
+ALTER COLUMN premium SET DEFAULT false;
+`);
+
+await pool.query(`
+UPDATE users_new
+SET premium = false
+WHERE premium IS NULL;
+`);
+
+console.log("DB premium column fixed");
+} catch (e) {
+console.log("DB fix skipped:", e.message);
+}
+})();
+
+/* =========================
 HEALTH CHECK
 ========================= */
 app.get("/", (req, res) => {
@@ -54,7 +77,7 @@ await pool.query(
 `INSERT INTO users_new
 (email, password_hash, role, created_at, last_login, premium)
 VALUES ($1,$2,'user',NOW(),NOW(),false)`,
-[email, password]
+[email.toLowerCase(), password]
 );
 
 res.json({ success: true });
@@ -72,7 +95,7 @@ const { email, password } = req.body;
 
 const r = await pool.query(
 "SELECT premium FROM users_new WHERE email=$1 AND password_hash=$2",
-[email, password]
+[email.toLowerCase(), password]
 );
 
 if (r.rows.length > 0) {
@@ -93,7 +116,7 @@ const { email } = req.body;
 
 const r = await pool.query(
 "SELECT premium FROM users_new WHERE email=$1",
-[email]
+[email.toLowerCase()]
 );
 
 if (r.rows.length > 0) {
@@ -152,12 +175,16 @@ process.env.STRIPE_WEBHOOK_SECRET
 
 if (event.type === "checkout.session.completed") {
 const session = event.data.object;
-const email = session.client_reference_id;
+
+const email =
+session.client_reference_id ||
+session.customer_email ||
+session.customer_details?.email;
 
 if (email) {
 await pool.query(
 "UPDATE users_new SET premium=true WHERE email=$1",
-[email]
+[email.toLowerCase()]
 );
 }
 }
